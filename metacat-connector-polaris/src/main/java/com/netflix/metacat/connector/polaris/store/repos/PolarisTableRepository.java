@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -71,13 +72,17 @@ public interface PolarisTableRepository extends JpaRepository<PolarisTableEntity
      * Fetch table entities in database.
      * @param dbName database name
      * @param tableNamePrefix table name prefix. can be empty.
+     * @param snapshotTime snapshotTime to use in query
      * @param page pageable.
      * @return table entities that belong to the database.
      */
-    @Query("SELECT e FROM PolarisTableEntity e WHERE e.dbName = :dbName AND e.tblName LIKE :tableNamePrefix%")
+
+    @Query(nativeQuery = true, value = "SELECT t.* FROM tbls t AS OF SYSTEM TIME :snapshotTime "
+        + "WHERE t.dbName = :dbName AND t.tblName LIKE :tableNamePrefix%")
     Slice<PolarisTableEntity> findAllTablesByDbNameAndTablePrefix(
         @Param("dbName") final String dbName,
         @Param("tableNamePrefix") final String tableNamePrefix,
+        @Param("snapshotTime") final String snapshotTime,
         Pageable page);
 
     /**
@@ -103,4 +108,11 @@ public interface PolarisTableRepository extends JpaRepository<PolarisTableEntity
         @Param("newLocation") final String newLocation,
         @Param("lastModifiedBy") final String lastModifiedBy,
         @Param("lastModifiedDate") final Instant lastModifiedDate);
+
+    /**
+     * Return the follower reader timestamp from crdb.
+     * @return follower reader timestamp
+     */
+    @Query(value = "SELECT follower_read_timestamp()", nativeQuery = true)
+    Timestamp findFollowerReadTimestamp();
 }

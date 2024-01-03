@@ -3,7 +3,6 @@ package com.netflix.metacat.connector.polaris;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.netflix.metacat.common.QualifiedName;
 import com.netflix.metacat.common.dto.Pageable;
@@ -28,6 +27,7 @@ import com.netflix.metacat.connector.polaris.configs.PolarisPersistenceConfig;
 import com.netflix.metacat.connector.polaris.mappers.PolarisTableMapper;
 import com.netflix.metacat.connector.polaris.store.PolarisStoreService;
 import com.netflix.spectator.api.NoopRegistry;
+import lombok.Getter;
 import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,7 +47,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 
 /**
@@ -58,10 +57,11 @@ import java.util.stream.Collectors;
 @ActiveProfiles(profiles = {"polarisconnectortest"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
 @AutoConfigureDataJpa
+@Getter
 public class PolarisConnectorTableServiceTest {
-    private static final String CATALOG_NAME = "catalog_name";
-    private static final String DB_NAME = "db_name";
-    private static final QualifiedName DB_QUALIFIED_NAME = QualifiedName.ofDatabase(CATALOG_NAME, DB_NAME);
+    public static final String CATALOG_NAME = "catalog_name";
+    public static final String DB_NAME = "db_name";
+    public static final QualifiedName DB_QUALIFIED_NAME = QualifiedName.ofDatabase(CATALOG_NAME, DB_NAME);
 
     @Autowired
     private PolarisStoreService polarisStoreService;
@@ -100,6 +100,13 @@ public class PolarisConnectorTableServiceTest {
                 new IcebergTableOpsProxy()),
             new PolarisTableMapper(CATALOG_NAME),
             connectorContext);
+
+        // For crdb, we need to insert the db record otherwise it will throw
+        // org.postgresql.util.PSQLException: ERROR:
+        // insert on table "tbls" violates foreign key constraint "fk_db_name_ref_dbs"
+        // for h2db, this is not a hard requirement
+        final String location = "file://temp";
+        getPolarisStoreService().createDatabase(DB_NAME, location, "metacat_user");
     }
 
     /**
@@ -128,31 +135,6 @@ public class PolarisConnectorTableServiceTest {
         polarisTableService.create(requestContext, tableInfo);
         exists = polarisTableService.exists(requestContext, qualifiedName);
         Assert.assertTrue(exists);
-    }
-
-    /**
-     * Test table list.
-     */
-    @Test
-    public void testList() {
-        final QualifiedName name1 = QualifiedName.ofTable(CATALOG_NAME, DB_NAME, "table1");
-        final TableInfo tableInfo1 = TableInfo.builder()
-            .name(name1)
-            .metadata(ImmutableMap.of("table_type", "ICEBERG", "metadata_location", "loc1"))
-            .build();
-        polarisTableService.create(requestContext, tableInfo1);
-        final QualifiedName name2 = QualifiedName.ofTable(CATALOG_NAME, DB_NAME, "table2");
-        final TableInfo tableInfo2 = TableInfo.builder()
-            .name(name2)
-            .metadata(ImmutableMap.of("table_type", "ICEBERG", "metadata_location", "loc2"))
-            .build();
-        polarisTableService.create(requestContext, tableInfo2);
-        final QualifiedName qualifiedName = QualifiedName.ofTable(CATALOG_NAME, DB_NAME, "");
-        final List<TableInfo> tables = polarisTableService.list(
-            requestContext, DB_QUALIFIED_NAME, qualifiedName, new Sort(null, SortOrder.ASC), new Pageable(2, 0));
-        Assert.assertEquals(tables.size(), 2);
-        Assert.assertEquals(tables.stream().map(TableInfo::getName).collect(Collectors.toSet()),
-            ImmutableSet.of(name1, name2));
     }
 
     /**

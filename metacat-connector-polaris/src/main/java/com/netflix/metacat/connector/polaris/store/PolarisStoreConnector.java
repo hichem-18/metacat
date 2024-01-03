@@ -13,6 +13,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -155,15 +156,17 @@ public class PolarisStoreConnector implements PolarisStoreService {
      */
     @Override
     @Transactional(propagation = Propagation.SUPPORTS)
-    public List<PolarisTableEntity> getTableEntities(final String databaseName, final String tableNamePrefix) {
+    public List<PolarisTableEntity> getTableEntities(final String databaseName,
+                                                     final String tableNamePrefix) {
         final int pageFetchSize = 1000;
         final List<PolarisTableEntity> retval = new ArrayList<>();
         final String tblPrefix =  tableNamePrefix == null ? "" : tableNamePrefix;
         Pageable page = PageRequest.of(0, pageFetchSize, Sort.by("tblName").ascending());
         Slice<PolarisTableEntity> tbls;
+        final Timestamp ts = tblRepo.findFollowerReadTimestamp();
         boolean hasNext;
         do {
-            tbls = tblRepo.findAllTablesByDbNameAndTablePrefix(databaseName, tblPrefix, page);
+            tbls = tblRepo.findAllTablesByDbNameAndTablePrefix(databaseName, tblPrefix, ts.toString(), page);
             retval.addAll(tbls.toList());
             hasNext = tbls.hasNext();
             if (hasNext) {

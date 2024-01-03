@@ -77,7 +77,8 @@ public interface PolarisStoreService {
      * @param tableNamePrefix table name prefix. can be empty.
      * @return table entities in the database.
      */
-    List<PolarisTableEntity> getTableEntities(final String databaseName, final String tableNamePrefix);
+    List<PolarisTableEntity> getTableEntities(final String databaseName,
+                                              final String tableNamePrefix);
 
     /**
      * Updates existing or creates new table entry.
